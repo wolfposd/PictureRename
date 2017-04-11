@@ -67,6 +67,10 @@ public class StartupPicture {
 			System.out.println("Performing dry-run, no pictures will be changed");
 		}
 
+		if (adjustHours != 0) {
+			System.out.println("Adjusting Time by " + adjustHours + " hours");
+		}
+
 		File baseFolder = new File(path);
 
 		for (File f : baseFolder.listFiles((FilenameFilter) (dir, name) -> name.toLowerCase().endsWith("jpg"))) {
