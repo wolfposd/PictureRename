@@ -45,66 +45,93 @@ import com.drew.metadata.exif.ExifSubIFDDirectory;
  */
 public class StartupPicture {
 
-	public static final SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss");
+    public static final SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss");
 
-	public static void main(String[] args) {
+    public static void main(String[] args) {
 
-		if (args.length == 3) {
-			walkFiles(args[0], Boolean.parseBoolean(args[1]), Integer.parseInt(args[2]));
-		} else {
-			System.out.println("Need 3 arguments:");
-			System.out.println("     {image.dir} {rename=true/false} {adjust hours=int}");
-			System.out.println("\nExample:");
-			System.out.println("    java -jar PictureRename.jar /path/to/my/pictures false 12");
-			System.out.println("    performs a dryrun and adds 12hours to every date");
-		}
+        if (args.length == 3) {
+            walkFiles(args[0], Boolean.parseBoolean(args[1]), Integer.parseInt(args[2]));
+        } else {
+            System.out.println("Need 3 arguments:");
+            System.out.println("     {image.dir} {rename=true/false} {adjust hours=int}");
+            System.out.println("\nExample:");
+            System.out.println("    java -jar PictureRename.jar /path/to/my/pictures false 12");
+            System.out.println("    performs a dryrun and adds 12hours to every date");
+        }
 
-	}
+    }
 
-	public static void walkFiles(String path, boolean rename, int adjustHours) {
+    public static void walkFiles(String path, boolean rename, int adjustHours) {
 
-		if (!rename) {
-			System.out.println("Performing dry-run, no pictures will be changed");
-		}
+        if (!rename) {
+            System.out.println("Performing dry-run, no pictures will be changed");
+        }
 
-		if (adjustHours != 0) {
-			System.out.println("Adjusting Time by " + adjustHours + " hours");
-		}
+        if (adjustHours != 0) {
+            System.out.println("Adjusting Time by " + adjustHours + " hours");
+        }
 
-		File baseFolder = new File(path);
+        File baseFolder = new File(path);
 
-		for (File f : baseFolder.listFiles((FilenameFilter) (dir, name) -> name.toLowerCase().endsWith("jpg"))) {
+        for (File f : baseFolder.listFiles((FilenameFilter) (dir, name) -> name.toLowerCase().endsWith("jpg"))) {
 
-			try {
-				handleFile(rename, adjustHours, f);
-			} catch (ImageProcessingException | IOException e) {
-				System.err.println("Error with picture: " + f.getName() + ", skipping...");
-			}
+            try {
+                handleFile(rename, adjustHours, f);
+            } catch (ImageProcessingException | IOException e) {
+                System.err.println("Error with picture: " + f.getName() + ", skipping...");
+            }
 
-		}
+        }
 
-	}
+    }
 
-	private static void handleFile(boolean rename, int adjustHours, File f)
-			throws ImageProcessingException, IOException {
-		Metadata md = ImageMetadataReader.readMetadata(f);
+    private static void handleFile(boolean rename, int adjustHours, File f) throws ImageProcessingException, IOException {
+        Metadata md = ImageMetadataReader.readMetadata(f);
 
-		ExifSubIFDDirectory directory = md.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
+        ExifSubIFDDirectory directory = md.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
 
-		Date date = directory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
+        Date date = directory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
 
-		if (adjustHours != 0) {
-			Calendar cal = Calendar.getInstance();
-			cal.setTime(date);
-			cal.add(Calendar.HOUR, adjustHours);
-			date = cal.getTime();
-		}
+        if (adjustHours != 0) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(date);
+            cal.add(Calendar.HOUR, adjustHours);
+            date = cal.getTime();
+        }
 
-		System.out.println((rename ? "Renaming: " : "") + f.getName() + " -> " + format.format(date) + ".jpg");
+        String oldname = f.getName();
+        String newName = format.format(date) + "_0.jpg";
 
-		if (rename) {
-			f.renameTo(new File(f.getParentFile(), format.format(date) + ".jpg"));
-		}
-	}
+        if (new File(f.getParentFile(), newName).exists()) {
+            // already exists append number
+            int i = checkForNumber(f.getParentFile(), newName);
+            newName = format.format(date) + "_" + i + ".jpg";
+        }
+
+        if (rename) {
+            System.out.println("Renaming: " + oldname + " -> " + newName);
+            f.renameTo(new File(f.getParentFile(), newName));
+        } else {
+            System.out.println("Testing: " + oldname + " -> " + newName);
+        }
+    }
+
+    private static int checkForNumber(File folder, String newName) {
+        int i = 0;
+
+        String checkname = newName.replace("_0.", "_" + i + ".");
+
+        do {
+            File check = new File(folder, checkname);
+            if (check.exists()) {
+                i++;
+                checkname = newName.replace("_0.", "_" + i + ".");
+            } else
+                break;
+        } while (true);
+
+        return i;
+
+    }
 
 }
