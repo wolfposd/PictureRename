@@ -90,6 +90,11 @@ public class StartupPicture {
 
         ExifSubIFDDirectory directory = md.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
 
+        if(directory == null) {
+            System.out.println("No EXIF Infos: " + f.getName());
+            return;
+        }
+        
         Date date = directory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
 
         if (adjustHours != 0) {
