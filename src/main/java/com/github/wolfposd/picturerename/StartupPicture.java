@@ -26,6 +26,9 @@ package com.github.wolfposd.picturerename;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -73,8 +76,7 @@ public class StartupPicture {
 
         File baseFolder = new File(path);
 
-        for (File f : baseFolder.listFiles((FilenameFilter) (dir, name) -> name.toLowerCase().endsWith("jpg"))) {
-
+        for (File f : baseFolder.listFiles((FilenameFilter) (dir, name) -> name.toLowerCase().matches(".*(jpg)"))) {
             try {
                 handleFile(rename, adjustHours, f);
             } catch (ImageProcessingException | IOException e) {
@@ -82,7 +84,34 @@ public class StartupPicture {
             }
 
         }
+        
+        for (File f : baseFolder.listFiles((FilenameFilter) (dir, name) -> !name.toLowerCase().matches(".*(jpg)"))) {
+            try {
+                handleFileNotImage(rename, adjustHours, f);
+            } catch (IOException e) {
+                System.err.println("Error with file: " + f.getName() + ", skipping...");
+            }
+        }
 
+    }
+
+    private static void handleFileNotImage(boolean rename, int adjustHours, File f) throws IOException {
+        
+        
+        BasicFileAttributes attr = Files.readAttributes(f.toPath(), BasicFileAttributes.class);
+        FileTime creationTime = attr.creationTime();
+        
+        System.err.println("Using file creation time for " + f.getName());
+        Date date = new Date(creationTime.toMillis());
+        if (adjustHours != 0) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(date);
+            cal.add(Calendar.HOUR, adjustHours);
+            date = cal.getTime();
+        }
+        
+        rename(rename, f, date);
+        
     }
 
     private static void handleFile(boolean rename, int adjustHours, File f) throws ImageProcessingException, IOException {
@@ -90,12 +119,20 @@ public class StartupPicture {
 
         ExifSubIFDDirectory directory = md.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
 
-        if(directory == null) {
+        if (directory == null) {
             System.out.println("No EXIF Infos: " + f.getName());
             return;
         }
-        
+
         Date date = directory.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
+
+        if (date == null) {
+            BasicFileAttributes attr = Files.readAttributes(f.toPath(), BasicFileAttributes.class);
+            FileTime creationTime = attr.creationTime();
+            date = new Date(creationTime.toMillis());
+
+            System.err.println("Using file creation time for " + f.getName());
+        }
 
         if (adjustHours != 0) {
             Calendar cal = Calendar.getInstance();
@@ -104,13 +141,20 @@ public class StartupPicture {
             date = cal.getTime();
         }
 
+        rename(rename, f, date);
+    }
+
+    private static void rename(boolean rename, File f, Date date) {
+        
+        final String ending = f.getName().substring(f.getName().lastIndexOf(".")+1);
+
         String oldname = f.getName();
-        String newName = format.format(date) + "_0.jpg";
+        String newName = format.format(date) + "_0." + ending;
 
         if (new File(f.getParentFile(), newName).exists()) {
             // already exists append number
             int i = checkForNumber(f.getParentFile(), newName);
-            newName = format.format(date) + "_" + i + ".jpg";
+            newName = format.format(date) + "_" + i + "." + ending;
         }
 
         if (rename) {
